@@ -117,7 +117,7 @@ export default function Chat() {
               className="text-[#F48120]"
               data-icon="agents"
             >
-              <title>Cloudflare Agents</title>
+              <title>SAR Bot</title>
               <symbol id="ai:local:agents" viewBox="0 0 80 79">
                 <path
                   fill="currentColor"
@@ -129,7 +129,7 @@ export default function Chat() {
           </div>
 
           <div className="flex-1">
-            <h2 className="font-semibold text-base">AI Chat Agent</h2>
+            <h2 className="font-semibold text-base">SAR Bot</h2>
           </div>
 
           <div className="flex items-center gap-2 mr-2">
@@ -171,7 +171,7 @@ export default function Chat() {
                   <div className="bg-[#F48120]/10 text-[#F48120] rounded-full p-3 inline-flex">
                     <Robot size={24} />
                   </div>
-                  <h3 className="font-semibold text-lg">Welcome to AI Chat</h3>
+                  <h3 className="font-semibold text-lg">Welcome to SAR Bot</h3>
                   <p className="text-muted-foreground text-sm">
                     Start a conversation with your AI assistant. Try asking
                     about:

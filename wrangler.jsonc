@@ -32,7 +32,20 @@
 	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	"d1_databases": [
+    	{
+      		"binding": "DB",
+      		"database_name": "sar-bot",
+      		"database_id": "5151bfc1-8ce5-4c2d-8101-f1c5460ed707"
+    	}
+  	],
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "sar-bot"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
