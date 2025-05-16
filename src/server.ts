@@ -13,7 +13,11 @@ import {
 import { openai } from "@ai-sdk/openai";
 import { processToolCalls } from "./utils";
 import { tools, executions } from "./tools";
-// import { env } from "cloudflare:workers";
+import { env, WorkflowEntrypoint, WorkflowStep, type WorkflowEvent } from "cloudflare:workers";
+import OpenAI from "openai";
+import { Hono } from "hono";
+
+const app = new Hono<{ Bindings: Env }>();
 
 const model = openai("gpt-4o-2024-11-20");
 // Cloudflare AI Gateway
@@ -100,28 +104,62 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
   }
 }
 
-/**
- * Worker entry point that routes incoming requests to the appropriate handler
- */
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const url = new URL(request.url);
+type DocumentRow = {
+  id: number;
+  text: string;
+}
 
-    if (url.pathname === "/check-open-ai-key") {
-      const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-      return Response.json({
-        success: hasOpenAIKey,
+export class RAGWorkflow extends WorkflowEntrypoint<Env, Params> {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    const env = this.env;
+    const { text } = event.payload;
+
+    const record = await step.do('create database record', async () => {
+      const query = "INSERT INTO docs (text) VALUES (?) RETURNING *";
+      const { results } = await env.DB.prepare(query).bind(text).run<DocumentRow>();
+      const record = results[0];
+      if (!record) throw new Error("Failed to create document");
+      return record;
+    });
+
+    const embedding = await step.do('generate embedding', async () => {
+      const ai = new OpenAI();
+      const embedding = await ai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: text,
+        encoding_format: "float",
       });
-    }
-    if (!process.env.OPENAI_API_KEY) {
-      console.error(
-        "OPENAI_API_KEY is not set, don't forget to set it locally in .dev.vars, and use `wrangler secret bulk .dev.vars` to upload it to production"
-      );
-    }
-    return (
-      // Route the request to our agent or return 404 if not found
-      (await routeAgentRequest(request, env)) ||
-      new Response("Not found", { status: 404 })
-    );
-  },
-} satisfies ExportedHandler<Env>;
+      return embedding.data[0].embedding;
+    });
+
+    await step.do('insert vector', async () => {
+      if (!record) return;
+      return env.VECTORIZE.upsert([
+        {
+          id: record.id.toString(),
+          values: embedding,
+        },
+      ]);
+    });
+  }
+}
+
+app.get("/check-open-ai-key", async (c) => {
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  return c.json({
+    success: hasOpenAIKey,
+  });
+});
+
+app.post("/text", async (c) => {
+  const { text } = await c.req.json();
+  if (!text) return c.text("Missing text", 400);
+  await c.env.RAG_WORKFLOW.create({ params: { text } });
+  return c.text("Create note", 201);
+});
+
+app.get("*", async (c) => {
+  return await routeAgentRequest(c.req.raw, env);
+});
+
+export default app;
