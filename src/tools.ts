@@ -8,6 +8,8 @@ import { z } from "zod";
 import type { Chat } from "./server";
 import { getCurrentAgent } from "agents";
 import { unstable_scheduleSchema } from "agents/schedule";
+import OpenAI from "openai";
+import { env } from "cloudflare:workers";
 
 /**
  * Weather information tool that requires human confirmation
@@ -31,6 +33,22 @@ const getLocalTime = tool({
   execute: async ({ location }) => {
     console.log(`Getting local time for ${location}`);
     return "10am";
+  },
+});
+
+const getRAGTool = tool({
+  description: "get additional context from knowledge base",
+  parameters: z.object({ query: z.string() }),
+  execute: async ({ query }) => {
+    const ai = new OpenAI();
+    const embedding = await ai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: query,
+      encoding_format: "float",
+    });
+    const vectors = embedding.data[0].embedding;
+    const vectoryQuery = await env.VECTORIZE.query(vectors, { topK: 5 });
+
   },
 });
 
@@ -119,6 +137,7 @@ export const tools = {
   scheduleTask,
   getScheduledTasks,
   cancelScheduledTask,
+  getRAGTool,
 };
 
 /**
