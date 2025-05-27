@@ -159,7 +159,11 @@ app.post("/text", async (c) => {
 });
 
 app.get("*", async (c) => {
-  return await routeAgentRequest(c.req.raw, env);
+  const resp = await routeAgentRequest(c.req.raw, env);
+  if ( resp === null) {
+    return;
+  }
+  return resp;
 });
 
 export default app;
