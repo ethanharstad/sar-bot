@@ -13,7 +13,12 @@ import {
 import { openai } from "@ai-sdk/openai";
 import { processToolCalls } from "./utils";
 import { tools, executions } from "./tools";
-import { env, WorkflowEntrypoint, WorkflowStep, type WorkflowEvent } from "cloudflare:workers";
+import {
+  env,
+  WorkflowEntrypoint,
+  type WorkflowStep,
+  type WorkflowEvent,
+} from "cloudflare:workers";
 import OpenAI from "openai";
 import { Hono } from "hono";
 
@@ -107,22 +112,24 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 type DocumentRow = {
   id: number;
   text: string;
-}
+};
 
 export class RAGWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     const env = this.env;
     const { text } = event.payload;
 
-    const record = await step.do('create database record', async () => {
+    const record = await step.do("create database record", async () => {
       const query = "INSERT INTO docs (text) VALUES (?) RETURNING *";
-      const { results } = await env.DB.prepare(query).bind(text).run<DocumentRow>();
+      const { results } = await env.DB.prepare(query)
+        .bind(text)
+        .run<DocumentRow>();
       const record = results[0];
       if (!record) throw new Error("Failed to create document");
       return record;
     });
 
-    const embedding = await step.do('generate embedding', async () => {
+    const embedding = await step.do("generate embedding", async () => {
       const ai = new OpenAI();
       const embedding = await ai.embeddings.create({
         model: "text-embedding-3-small",
@@ -132,7 +139,7 @@ export class RAGWorkflow extends WorkflowEntrypoint<Env, Params> {
       return embedding.data[0].embedding;
     });
 
-    await step.do('insert vector', async () => {
+    await step.do("insert vector", async () => {
       if (!record) return;
       return env.VECTORIZE.upsert([
         {
@@ -160,7 +167,7 @@ app.post("/text", async (c) => {
 
 app.get("*", async (c) => {
   const resp = await routeAgentRequest(c.req.raw, env);
-  if ( resp === null) {
+  if (resp === null) {
     return;
   }
   return resp;

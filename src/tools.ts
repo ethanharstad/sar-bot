@@ -41,14 +41,50 @@ const getRAGTool = tool({
   parameters: z.object({ query: z.string() }),
   execute: async ({ query }) => {
     const ai = new OpenAI();
+
+    // Build query
     const embedding = await ai.embeddings.create({
       model: "text-embedding-3-small",
       input: query,
       encoding_format: "float",
     });
     const vectors = embedding.data[0].embedding;
-    const vectoryQuery = await env.VECTORIZE.query(vectors, { topK: 5 });
 
+    // Query vector store
+    const vectoryQuery = await env.VECTORIZE.query(vectors, { topK: 5 });
+    let vecId;
+    if (
+      vectoryQuery.matches &&
+      vectoryQuery.matches.length > 0 &&
+      vectoryQuery.matches[0]
+    ) {
+      vecId = vectoryQuery.matches[0].id;
+    } else {
+      console.log("No matching vector found or vectoryQuery.matches is empty");
+    }
+
+    // Retrieve notes
+    let notes: string[] = [];
+    if (vecId) {
+      const query = 'SELECT * FROM docs WHERE id = ?';
+      const { results } = await env.DB.prepare(query).bind(vecId).all();
+      if (results) notes = results.map((vec) => vec.text as string);
+    }
+
+    const contextMessage = notes.length
+      ? `Context:\n${notes.map((note) => `- ${note}`).join("\n")}`
+      : "";
+
+    const systemPrompt = `When answering the question or responding, use the context provided, if it is provided and relevant.`;
+
+    const r = await ai.responses.create({
+      model: "gpt-4.1",
+      input: [
+        ...(notes.length ? [{ role: "developer" as const, content: contextMessage }]: []),
+        
+      ],
+    }
+    );
   },
 });
 
