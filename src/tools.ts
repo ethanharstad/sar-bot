@@ -52,7 +52,7 @@ const getRAGTool = tool({
 
     // Query vector store
     const vectoryQuery = await env.VECTORIZE.query(vectors, { topK: 5 });
-    let vecId;
+    let vecId: string | null = null;
     if (
       vectoryQuery.matches &&
       vectoryQuery.matches.length > 0 &&
@@ -66,7 +66,7 @@ const getRAGTool = tool({
     // Retrieve notes
     let notes: string[] = [];
     if (vecId) {
-      const query = 'SELECT * FROM docs WHERE id = ?';
+      const query = "SELECT * FROM docs WHERE id = ?";
       const { results } = await env.DB.prepare(query).bind(vecId).all();
       if (results) notes = results.map((vec) => vec.text as string);
     }
@@ -75,16 +75,21 @@ const getRAGTool = tool({
       ? `Context:\n${notes.map((note) => `- ${note}`).join("\n")}`
       : "";
 
-    const systemPrompt = `When answering the question or responding, use the context provided, if it is provided and relevant.`;
+    const systemPrompt =
+      "When answering the question or responding, use the context provided, if it is provided and relevant.";
 
     const r = await ai.responses.create({
       model: "gpt-4.1",
       input: [
-        ...(notes.length ? [{ role: "developer" as const, content: contextMessage }]: []),
-        
+        ...(notes.length
+          ? [{ role: "developer" as const, content: contextMessage }]
+          : []),
+        { role: "developer", content: systemPrompt },
+        { role: "user", content: query },
       ],
-    }
-    );
+    });
+
+    return r.output_text;
   },
 });
 
